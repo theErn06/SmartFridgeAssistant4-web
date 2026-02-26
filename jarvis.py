@@ -19,26 +19,35 @@ from datetime import datetime, timedelta
 from faster_whisper import WhisperModel
 from typing import List, Dict, Any
 
+# ==========================================
+# CONFIGURATION & FILE PATHS
+# ==========================================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MEMORY_FILE = os.path.join(SCRIPT_DIR, "fridge.json")
-WASTE_FILE = os.path.join(SCRIPT_DIR, "waste_log.json")
-OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "jarvis"
+MEMORY_FILE = os.path.join(SCRIPT_DIR, "fridge.json")       # Main inventory database
+WASTE_FILE = os.path.join(SCRIPT_DIR, "waste_log.json")     # Historical waste tracking
+OLLAMA_URL = "http://localhost:11434/api/chat"              # Local Edge-LLM endpoint
+MODEL_NAME = "jarvis"                                       # Custom Ollama model name
 
-MIN_POSSIBLE_THRESHOLD = 100   
-MAX_POSSIBLE_THRESHOLD = 8000  
-NOISE_MULTIPLIER = 1.15       
+# ==========================================
+# DYNAMIC MICROPHONE NOISE CALIBRATION
+# ==========================================
+MIN_POSSIBLE_THRESHOLD = 100   # Absolute minimum volume required to trigger the mic
+MAX_POSSIBLE_THRESHOLD = 8000  # Maximum cap to prevent ignoring very loud speech
+NOISE_MULTIPLIER = 1.15        # Scales threshold slightly above the room's background noise
 
+# Audio Format Settings (Required by Silero VAD & Whisper)
 SAMPLE_RATE = 16000
 BLOCK_SIZE = 512   
 CHANNELS = 1
 
-SILENCE_TOLERANCE_SEC = 2.0   
+# Voice Activity Detection (VAD) Settings
+SILENCE_TOLERANCE_SEC = 2.0    # How long to wait after the user stops speaking before processing
 SILENCE_THRESHOLD_BLOCKS = int(SILENCE_TOLERANCE_SEC / (BLOCK_SIZE / SAMPLE_RATE)) 
-VAD_THRESHOLD = 0.2           
+VAD_THRESHOLD = 0.2            # Sensitivity of the AI detecting a human voice (0.0 to 1.0)
 
+# Faster-Whisper Model Settings
 WHISPER_MODEL_SIZE = "small.en"
-USE_GPU = torch.cuda.is_available()
+USE_GPU = torch.cuda.is_available() # Automatically use GPU if available
 WHISPER_COMPUTE_TYPE = "float16" if USE_GPU else "float32"
 INITIAL_PROMPT = (
     "Kitchen command context. "
@@ -47,13 +56,17 @@ INITIAL_PROMPT = (
     "Quantities: 1, 2, 3. Prepositions: into, inside."
 )
 
+# Automated expiration dates based on generic food categories
 SHELF_LIFE_RULES = {
     "protein": 4, "seafood": 7, "dairy": 10, 
     "vegetables": 7, "fruits": 7, "grains": 14,       
     "pantry": 365, "processed": 7, "non-food": 0
 }
 
-CONVERSATION_HISTORY = collections.deque(maxlen=10)
+# ==========================================
+# GLOBAL SYSTEM STATES
+# ==========================================
+CONVERSATION_HISTORY = collections.deque(maxlen=10) # Retains last 10 messages for LLM context
 VOICE_MODE = True
 CURRENT_NOISE_LEVEL = 0
 DYNAMIC_THRESHOLD = 1000
@@ -64,16 +77,20 @@ door_open = False
 door_open_time = None
 conversation_ended_time = None
 tts_lock = threading.Lock()
-lcd_busy_until = 0 # NEW: Tracks when the LCD is done scrolling so Python doesn't sleep!
+lcd_busy_until = 0 # Tracks when the Arduino LCD finishes scrolling text
 
+# ==========================================
+# ARDUINO AUTO-DETECTION
+# ==========================================
 arduino = None
 ports = serial.tools.list_ports.comports()
 for port in ports:
+    # Look for common microcontrollers on USB ports
     if "Arduino" in port.description or "CH340" in port.description or "USB Serial" in port.description:
         try:
             print(f"🔌 Connecting to Arduino on {port.device}...")
             arduino = serial.Serial(port.device, 9600, timeout=1)
-            time.sleep(2)
+            time.sleep(2) # Give the Arduino time to reset after serial connection
             break 
         except Exception as e:
             print(f"⚠️ Found Arduino on {port.device} but couldn't connect: {e}")
@@ -82,13 +99,18 @@ if not arduino:
     print("⚠️ Arduino not detected. Hardware features disabled.")
 
 def send_to_lcd(text: str):
+    """Safely pushes strings to the Arduino LCD via Serial."""
     if arduino:
         try:
             arduino.write((text.strip() + "\n").encode())
         except Exception:
             pass
 
+# ==========================================
+# HARDWARE BACKGROUND THREADS
+# ==========================================
 def listen_door_events():
+    """Runs continuously in the background to catch instant door open/close events."""
     global jarvis_awake, door_open, door_open_time
 
     while True:
@@ -99,7 +121,7 @@ def listen_door_events():
                 if msg == "DOOR_OPEN":
                     door_open = True
                     door_open_time = time.time()
-                    jarvis_awake = True
+                    jarvis_awake = True # Auto-wake Jarvis when fridge opens
                     send_to_lcd("JARVIS: Door opened")
 
                 elif msg == "DOOR_CLOSED":
@@ -111,6 +133,7 @@ def listen_door_events():
         time.sleep(0.1)
 
 def door_reminder_watchdog():
+    """Checks if the door has been left open for more than 30 seconds after interaction ends."""
     global door_open_time
     while True:
         if (
@@ -120,10 +143,14 @@ def door_reminder_watchdog():
             and time.time() - conversation_ended_time >= 30
         ):
             speak("Please close the fridge door.")
-            time.sleep(30)
+            time.sleep(30) # Prevent spamming, remind every 30 seconds
         time.sleep(1)
 
+# ==========================================
+# DATABASE & DATA MANAGEMENT LOGIC
+# ==========================================
 def normalize_item_name(item: str, existing_names: List[str]) -> str:
+    """Standardizes plurals to prevent duplicate entries (e.g., 'apple' vs 'apples')."""
     item = item.lower().strip()
     if not item: return item
     variations = {item}
@@ -155,6 +182,7 @@ def save_fridge(fridge: Dict[str, Any]) -> None:
         print(f"   [ERROR] Could not save JSON: {e}")
 
 def log_waste(item: str, qty: float, unit: str):
+    """Appends expired items to a permanent waste tracking log when they are removed."""
     waste_data = []
     if os.path.exists(WASTE_FILE):
         try:
@@ -176,8 +204,11 @@ def log_waste(item: str, qty: float, unit: str):
         print(f"   [ERROR] Could not save waste log: {e}")
 
 def generate_waste_report(period: str) -> str:
+    """Calculates total waste over a timeframe to be spoken by Jarvis and sent to the dashboard."""
     fridge = load_fridge()
     dirty = False
+    
+    # Update status tags before reporting
     for k, v in fridge.items():
         exp = v.get("expiry", "N/A")
         new_stat = check_status(exp)
@@ -189,6 +220,7 @@ def generate_waste_report(period: str) -> str:
 
     today = datetime.now().date() 
     
+    # Set timeframe cutoff
     if "week" in period.lower():
         cutoff_date = today - timedelta(days=7)
         filename = "weekly.json"
@@ -203,6 +235,8 @@ def generate_waste_report(period: str) -> str:
         title = "Total Waste"
 
     report_items = []
+    
+    # Retrieve historical waste
     if os.path.exists(WASTE_FILE):
         try:
             with open(WASTE_FILE, "r", encoding="utf-8") as f: waste_data = json.load(f)
@@ -214,6 +248,7 @@ def generate_waste_report(period: str) -> str:
                 except: continue
         except: pass
 
+    # Include items currently expired in fridge
     for k, v in fridge.items():
         if v.get("status") == "EXPIRED":
             try:
@@ -228,6 +263,7 @@ def generate_waste_report(period: str) -> str:
                     })
             except: continue
 
+    # Save to file for website integration
     try:
         with open(os.path.join(SCRIPT_DIR, filename), "w", encoding="utf-8") as f:
             json.dump(report_items, f, indent=2, ensure_ascii=False)
@@ -244,6 +280,7 @@ def generate_waste_report(period: str) -> str:
     return f"{title} report generated. Total wasted or expired: {', '.join(lines)}."
 
 def calculate_expiry(category: str) -> str:
+    """Assigns an expiry date based on generic food categories."""
     days = SHELF_LIFE_RULES.get(category.lower(), 7) 
     if days == 0: return "N/A"
     return (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
@@ -253,6 +290,7 @@ def format_qty(value: float) -> str:
     return str(value)
 
 def check_status(expiry_str: str) -> str:
+    """Returns OK, SOON, or EXPIRED based on the current date."""
     if not expiry_str or expiry_str == "N/A": return "--"
     try:
         exp_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
@@ -264,19 +302,20 @@ def check_status(expiry_str: str) -> str:
     except: return "??"
 
 def update_fridge(action: str, item: str, qty: float, unit: str, category: str, selector: str = "oldest") -> tuple[str, str]:
+    """Handles adding, stacking, and removing items from the JSON database."""
     fridge = load_fridge()
     
     existing_names = [v['item_name'] for v in fridge.values()]
     item = normalize_item_name(item, existing_names)
     
     if not item: return "", ""
-    
     if qty < 0: return (f"   [ERROR] Invalid qty.", f"Cannot {action} negative quantity.")
     if qty == 0: return (f"   [IGNORED] Qty 0.", f"Added nothing.")
 
     if not category: category = "pantry"
     if unit.lower() in ["pcs", "piece"]: unit = "pieces"
 
+    # Handle clearing the entire fridge
     if action == "remove" and item in ["everything", "all", "all items", "the food"]:
         if not fridge: return "   [INFO] Fridge empty.", "Fridge is empty."
         count = len(fridge)
@@ -290,6 +329,8 @@ def update_fridge(action: str, item: str, qty: float, unit: str, category: str, 
     if action == "add":
         expiry_date = calculate_expiry(category)
         found_key = None
+        
+        # Check if identical batch exists to stack quantities
         for k, v in fridge.items():
             if v['item_name'] == item and v['expiry'] == expiry_date and v['unit'] == unit:
                 found_key = k
@@ -318,6 +359,7 @@ def update_fridge(action: str, item: str, qty: float, unit: str, category: str, 
         if not batches:
             term_msg, voice_msg = f"   [ERROR] No {item} found.", f"You don't have any {item}."
         else:
+            # Sort batches to remove oldest food first
             reverse_sort = True if (selector and selector.lower() in ["newest", "latest", "new", "fresh"]) else False
             sort_desc = "Newest" if reverse_sort else "Oldest"
             batches.sort(key=lambda x: x[1].get('expiry', '9999-99-99'), reverse=reverse_sort)
@@ -333,11 +375,12 @@ def update_fridge(action: str, item: str, qty: float, unit: str, category: str, 
                 v['qty'] -= deduct
                 qty_to_remove -= deduct
                 
+                # Log to waste if removing expired food
                 if check_status(v.get('expiry', 'N/A')) == "EXPIRED":
                     log_waste(item, deduct, v['unit']) 
 
                 removed_log.append(f"{deduct} (Exp: {v.get('expiry')})")
-                if v['qty'] <= 0: fridge.pop(k)
+                if v['qty'] <= 0: fridge.pop(k) # Delete empty entry
             
             if qty_to_remove > 0:
                 term_msg = f"   [PARTIAL] Removed {qty - qty_to_remove} {item} ({sort_desc}). Ran out."
@@ -350,15 +393,17 @@ def update_fridge(action: str, item: str, qty: float, unit: str, category: str, 
     return term_msg, voice_msg
 
 def get_list_outputs() -> tuple[str, str]:
+    """Generates an organized list of all inventory. Mutes TTS and non-blockingly displays on Arduino."""
     global lcd_busy_until # Allow us to edit the background timer
     
     fridge = load_fridge()
     
+    # Handle empty fridge case
     if not fridge: 
         msg = "The fridge is empty."
         full_text = f"JARVIS: {msg}"
         send_to_lcd(full_text)
-        lcd_busy_until = time.time() + 3.0
+        lcd_busy_until = time.time() + 3.0 # Set non-blocking timer
         return "   [EMPTY] Fridge is empty.", ""
         
     term_lines = ["\n📦 INVENTORY:", "-"*65, f"{'ITEM':<15} | {'QTY':<8} | {'EXPIRY':<12} | {'STATUS'}", "-"*65]
@@ -376,6 +421,7 @@ def get_list_outputs() -> tuple[str, str]:
     for k, total in item_sums.items():
         voice_parts.append(f"{format_qty(total)} {k}")
 
+    # Send the output string to the Arduino LCD
     lcd_msg = "Inventory: " + ", ".join(voice_parts) + "."
     full_text = f"JARVIS: {lcd_msg}"
     send_to_lcd(full_text)
@@ -384,6 +430,7 @@ def get_list_outputs() -> tuple[str, str]:
     if len(full_text) <= 32:
         delay = 3.0
     else:
+        # Arduino shifts 1 character every 300ms (.3 seconds)
         scroll_shifts = len(full_text) - 15
         delay = (scroll_shifts * 0.3) + 1.0
 
@@ -391,9 +438,11 @@ def get_list_outputs() -> tuple[str, str]:
     # and turn the mic back on, while the Arduino scrolls independently.
     lcd_busy_until = time.time() + delay
     
+    # Return empty voice string so TTS stays completely quiet
     return "\n".join(term_lines) + "\n", ""
 
 def get_lookup_output(item: str) -> tuple[str, str]:
+    """Checks for a specific item in the database."""
     fridge = load_fridge()
     item = normalize_item_name(item, []) 
     search_terms = {item, item + "s", item[:-1] if item.endswith("s") else item,
@@ -413,13 +462,18 @@ def get_lookup_output(item: str) -> tuple[str, str]:
 
     return "\n".join(term_lines), f"You have: " + " and ".join(voice_parts) + "."
 
+# ==========================================
+# SPEECH RECOGNITION (VAD + WHISPER) & TTS
+# ==========================================
 def clean_stt_text(text: str) -> str:
+    """Fixes common Whisper STT grammatical mistakes based on context."""
     text_lower = text.lower()
     text_lower = re.sub(r'\badd to\b', 'add two', text_lower)
     text_lower = re.sub(r'\bremove to\b', 'remove two', text_lower)
     return text_lower
 
 def get_quantity_from_speech(text: str) -> int:
+    """Fallback logic to extract numerical quantity if the LLM misses it."""
     text = text.lower()
     digits = re.findall(r"\b(\d+)\b", text)
     if digits: return int(digits[0])
@@ -431,6 +485,7 @@ def get_quantity_from_speech(text: str) -> int:
         if f" {word} " in f" {text} ": return num
     return 1 
 
+# Initialize Local Text-to-Speech Engine
 try:
     jarvis_voice = pyttsx3.init()
     jarvis_voice.setProperty("rate", 190) 
@@ -440,6 +495,7 @@ except Exception as e:
     jarvis_voice = None
 
 def speak(text: str) -> None:
+    """Outputs speech through speakers and simultaneously sends subtitles to Arduino LCD."""
     text = text.replace(" pcs", " pieces")
     with tts_lock:
         send_to_lcd(f"JARVIS: {text}")
@@ -450,14 +506,20 @@ def speak(text: str) -> None:
             except Exception as e:
                 print(f"   [TTS Error]: {e}")
     
+    # Small delay to prevent microphone from picking up the speaker's echo
     time.sleep(0.5) 
 
+# Initialize Local STT Engines
 whisper_model = WhisperModel(WHISPER_MODEL_SIZE, device="cuda" if USE_GPU else "cpu", compute_type=WHISPER_COMPUTE_TYPE)
 torch.set_num_threads(1)
 vad_model, utils = torch.hub.load(repo_or_dir="snakers4/silero-vad", model="silero_vad", trust_repo=True)
 (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
 
 def listen_dynamic():
+    """
+    Main audio listening loop. Uses Silero VAD to detect when human speech begins 
+    and ends, dynamically adjusting to room noise, before sending the chunk to Whisper.
+    """
     global CURRENT_NOISE_LEVEL, DYNAMIC_THRESHOLD, CURRENT_MIC_NAME, lcd_busy_until
     
     # Only push the "Listening..." screen if the Arduino is done scrolling a list
@@ -473,6 +535,7 @@ def listen_dynamic():
         CURRENT_MIC_NAME = current_mic
     except Exception: pass
 
+    # Queue buffers audio chunks from the microphone thread
     q = queue.Queue()
     def callback(indata, frames, time_, status): q.put(indata.copy())
 
@@ -496,11 +559,14 @@ def listen_dynamic():
                     send_to_lcd("Listening..." if jarvis_awake else "Awaiting...")
                     lcd_needs_reset = False
 
+                # Format audio for VAD (float32)
                 chunk_f32 = data[:, 0].astype(np.float32)
                 if len(chunk_f32) != 512: chunk_f32 = np.pad(chunk_f32, (0, 512 - len(chunk_f32)))
 
+                # Format audio for Whisper/Volume Analysis (int16)
                 pcm16 = (chunk_f32 * 32767).astype(np.int16)
 
+                # Dynamically calculate the room's noise floor to prevent false triggers
                 current_peak = np.max(np.abs(pcm16))
                 noise_buffer.append(current_peak)
                 avg_noise = int(sum(noise_buffer) / len(noise_buffer))
@@ -516,23 +582,25 @@ def listen_dynamic():
 
                 is_loud_enough = current_peak > DYNAMIC_THRESHOLD
                 
+                # Run VAD logic
                 speech_dict = vad_iterator(torch.from_numpy(chunk_f32)) if (is_loud_enough or speech_started) else {}
 
-                if speech_dict:
+                if speech_dict: # Speech actively detected
                     if not speech_started:
                         speech_started = True
                         if jarvis_awake:
                             send_to_lcd("Recording...")
-                            lcd_busy_until = 0 # Cancel the wait if user interrupts!
+                            lcd_busy_until = 0 # Cancel the LCD wait if user interrupts!
                         start_speech_time = time.time()
-                        audio_blocks.extend(list(pre_buffer)) 
+                        audio_blocks.extend(list(pre_buffer)) # Append pre-buffer to not cut off first syllable
                     audio_blocks.append(pcm16)
                     silence_blocks = 0
-                else:
+                else: # Silence detected
                     if not speech_started: pre_buffer.append(pcm16)
                     else:
                         silence_blocks += 1
                         audio_blocks.append(pcm16)
+                        # Break loop when silence timeout is reached or max recording time (15s) hits
                         if silence_blocks >= SILENCE_THRESHOLD_BLOCKS or (time.time() - start_speech_time > 15): break 
                             
     except Exception as e:
@@ -543,8 +611,9 @@ def listen_dynamic():
     vad_iterator.reset_states()
     if not audio_blocks: return ""
     
+    # Merge blocks and transcribe using Faster-Whisper
     full_audio = np.concatenate(audio_blocks).astype(np.int16)
-    if len(full_audio) < 4000: return ""
+    if len(full_audio) < 4000: return "" # Ignore micro-blips
 
     sys.stdout.write(f"\r   📝 Transcribing...                            ")
     sys.stdout.flush()
@@ -554,7 +623,11 @@ def listen_dynamic():
     segments, _ = whisper_model.transcribe(audio_float, beam_size=5, language="en", initial_prompt=INITIAL_PROMPT)
     return " ".join([s.text for s in segments]).strip()
 
+# ==========================================
+# EDGE-LLM EXECUTION ENGINE
+# ==========================================
 def ask_llm(user_input: str, context: str) -> str:
+    """Packages user speech and conversation history and pings the local Ollama LLM."""
     today = datetime.now().strftime("%Y-%m-%d")
     history_str = "\n".join(CONVERSATION_HISTORY)
     prompt = f"Current Date: {today}\n\n### CONTEXT\n{context}\n\n### HISTORY\n{history_str}\n\n### USER INPUT\nUser: \"{user_input}\""
@@ -563,6 +636,7 @@ def ask_llm(user_input: str, context: str) -> str:
         resp = requests.post(OLLAMA_URL, json={"model": MODEL_NAME, "messages": [{"role": "user", "content": prompt}], "stream": False}, timeout=60)
         if resp.status_code == 200:
             content = resp.json()["message"]["content"]
+            # Scrub formatting to ensure strict JSON output
             clean = content.replace("```json", "").replace("```", "").strip()
             s, e = clean.find('['), clean.rfind(']') + 1
             return clean[s:e] if s != -1 and e != -1 else "[]"
@@ -570,6 +644,7 @@ def ask_llm(user_input: str, context: str) -> str:
     return "[]"
 
 def execute(actions: List[Dict], user_text: str) -> None:
+    """Parses JSON commands returned by Ollama and executes database modifications."""
     print("\n" + "="*60)
     print(f"👤 USER COMMAND: {user_text}")
     print("-" * 60)
@@ -614,10 +689,15 @@ def execute(actions: List[Dict], user_text: str) -> None:
 
     if terminal_buffer: print("\n".join(terminal_buffer)) 
     
+    # Process TTS queue
     full_voice = ". ".join(voice_parts) + "."
     if voice_parts:
-        print(f"\n🤖 JARVIS: {full_voice}")
-        speak(full_voice)
+        # We only print the Jarvis label if there is actual voice to output
+        if full_voice.strip() != ".":
+            print(f"\n🤖 JARVIS: {full_voice}")
+            speak(full_voice)
+        
+        # Keep conversation history clean from giant lists
         if len(full_voice) > 200 and "inventory" in full_voice.lower():
             CONVERSATION_HISTORY.append("Jarvis: [Inventory List Output]")
         else:
@@ -626,9 +706,13 @@ def execute(actions: List[Dict], user_text: str) -> None:
     print("="*60 + "\n")
     sys.stdout.flush() 
 
+# ==========================================
+# MAIN APPLICATION LOOP
+# ==========================================
 if __name__ == "__main__":
     print(f"--- Jarvis ---")
     
+    # Initialize background hardware threads
     threading.Thread(target=listen_door_events, daemon=True).start()
     threading.Thread(target=door_reminder_watchdog, daemon=True).start()
 
@@ -644,6 +728,7 @@ if __name__ == "__main__":
         while True:
             text = ""
             
+            # Switch Inputs based on current mode
             if VOICE_MODE:
                 text = listen_dynamic()
             else:
@@ -663,6 +748,7 @@ if __name__ == "__main__":
             text_lower = text_clean.lower()
             send_to_lcd(f"YOU: {text_clean}")
             
+            # Input Control Overrides
             if any(x in text_lower for x in ["switch to text", "text mode"]):
                 if VOICE_MODE:
                     VOICE_MODE = False
@@ -679,6 +765,7 @@ if __name__ == "__main__":
                     speak("Switched to voice mode. I am ready.")
                 continue
 
+            # Wake word bypass logic
             if VOICE_MODE and not jarvis_awake:
                 wake_phrases = ["hey", "hay", "jarvis", "hi", "hello"]
                 
@@ -691,12 +778,14 @@ if __name__ == "__main__":
                     speak("I'm ready to listen.") 
                 continue
 
+            # Sleep control
             if any(x in text_lower for x in ["goodbye", "exit", "go to sleep"]):
                 speak("Thank you. Have a nice day.")
                 jarvis_awake = False
                 conversation_ended_time = time.time()
                 continue
 
+            # If awake, process user command via LLM
             if VOICE_MODE: print(f"\n   ⏳ Processing...")
             send_to_lcd("Processing...")
             
