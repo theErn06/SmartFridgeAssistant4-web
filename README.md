@@ -8,8 +8,9 @@ Version 4 update:
 -Fix bugs
 
 Website: https://theern06.github.io/SmartFridgeAssistant3-web/
+User have to log in before accessing to the Jarvis website. 
 
-User have to log in prior access to the Jarvis website. The version 3 website consists of 4 main page which are:
+The version 4 website consists of 4 main page which are:
 
 Inventory page
 Summary (Waste Food Data)
