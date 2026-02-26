@@ -32,7 +32,6 @@
       button { padding: 12px 20px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
       button:hover { background-color: #0056b3; }
       
-      /* Network UI */
       .network-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
       .btn-scan { background-color: #28a745; margin: 0; }
       .btn-scan:hover { background-color: #218838; }
@@ -97,7 +96,7 @@
                 <div style="text-align: left; margin-bottom: 10px;">
                     <div style="display: inline-block; background: #e9ecef; color: black; padding: 10px 15px; border-radius: 15px; max-width: 80%;">
                       <strong style="font-size: 12px; display: block; margin-bottom: 3px; color: #555;">Jarvis</strong>
-                      System online. I am ready for your commands.
+                      System online. Testing connection...
                     </div>
                 </div>
               </div>
@@ -122,13 +121,12 @@
       if (!currentUser) window.location.href = "login.html";
 
       $(document).ready(function() {
-          // If the hostname is already an IP (like when using Live Server), auto-apply it
-          let currentHost = window.location.hostname;
-          let ipRegex = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/;
-          if (ipRegex.test(currentHost)) $('#jarvis-ip').val(currentHost);
+          // --- AUTO CONNECT ON PAGE LOAD ---
+          // Attempt to load the last known working IP from storage, otherwise fallback to the box value
+          let savedIp = localStorage.getItem("jarvisIp") || $('#jarvis-ip').val();
+          $('#jarvis-ip').val(savedIp);
           
-          // Test the pre-filled connection immediately
-          testConnection($('#jarvis-ip').val());
+          testAndConnect(savedIp);
       });
 
       function toggleSidebar() { $("#sidebar, .sidebar-overlay").toggleClass("open"); }
@@ -151,28 +149,38 @@
 
       function handleEnter(e) { if (e.key === 'Enter') sendCommand(); }
 
-      function testConnection(ip) {
-          $.ajax({ url: `http://${ip}:5000/ping`, method: 'GET', timeout: 1000 }).catch(() => {
-              console.log("Connection to " + ip + " failed. User might need to scan.");
+      function testAndConnect(ip) {
+          if (!ip || ip === "localhost") {
+              scanNetwork();
+              return;
+          }
+
+          $.ajax({
+              url: `http://${ip}:5000/ping`,
+              method: 'GET',
+              timeout: 1500,
+              success: function() {
+                  appendMsg("System", `✅ <strong>Connected!</strong> Linked to PC at ${ip}`);
+                  localStorage.setItem("jarvisIp", ip); 
+              },
+              error: function() {
+                  appendMsg("System", `⚠️ Last known IP (${ip}) offline. Starting auto-scan...`);
+                  scanNetwork();
+              }
           });
       }
 
-      // --- NEW: DEEP WI-FI SCANNER ---
       function scanNetwork() {
           $('#scan-btn').text("Scanning...").prop("disabled", true);
-          appendMsg("System", "📡 <i>Scanning local Wi-Fi for Jarvis... This may take up to 5 seconds.</i>");
+          appendMsg("System", "📡 <i>Scanning local Wi-Fi for your PC...</i>");
           
-          // These are the 3 most common router IP ranges
-          let prefixes = ['192.168.1.', '192.168.0.', '192.168.100.', '10.0.0.'];
+          let subnets = ['192.168.1.', '192.168.0.', '192.168.100.', '10.0.0.'];
           let found = false;
-          let pending = 0;
-
-          // Rapid-fire test 1,000 potential IP addresses in the background
-          for (let prefix of prefixes) {
+          
+          for (let prefix of subnets) {
               for (let i = 2; i <= 254; i++) {
                   if (found) break;
                   let testIp = prefix + i;
-                  pending++;
                   
                   $.ajax({
                       url: `http://${testIp}:5000/ping`,
@@ -182,23 +190,22 @@
                           if (!found) {
                               found = true;
                               $('#jarvis-ip').val(testIp);
-                              appendMsg("System", `✅ <strong>Success!</strong> Connected to Jarvis automatically at ${testIp}`);
-                              $('#scan-btn').text("📡 Auto-Detect Wi-Fi").prop("disabled", false);
-                          }
-                      },
-                      complete: function() {
-                          pending--;
-                          // If all 1000 pings finish and we found nothing
-                          if (pending === 0 && !found) {
-                              appendMsg("System", "❌ Scan finished. Could not find Jarvis. Make sure the Python script is running on your laptop.");
+                              localStorage.setItem("jarvisIp", testIp);
+                              appendMsg("System", `✅ <strong>Success!</strong> Auto-connected to ${testIp}`);
                               $('#scan-btn').text("📡 Auto-Detect Wi-Fi").prop("disabled", false);
                           }
                       }
                   });
               }
           }
+
+          setTimeout(() => {
+              if (!found) {
+                  appendMsg("System", "❌ Scan finished. Could not find Jarvis. Make sure your PC is on the same Wi-Fi and Python is running.");
+                  $('#scan-btn').text("📡 Auto-Detect Wi-Fi").prop("disabled", false);
+              }
+          }, 3500);
       }
-      // ---------------------------------
 
       function sendCommand() {
         let input = $('#chat-input').val().trim();
