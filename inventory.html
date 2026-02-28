@@ -1,277 +1,143 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Jarvis Smart Fridge - Inventory</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="style.css" />
     <link
       rel="stylesheet"
       type="text/css"
       href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css"
     />
-    <style>
-      body {
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #f0f2f5;
-        margin: 0;
-        color: #333;
-      }
-      @media (min-width: 769px) {
-        body {
-          zoom: 110%;
-        }
-      }
-      #dashboard-wrapper {
-        display: flex;
-        height: 100vh;
-        overflow: hidden;
-      }
-      .sidebar {
-        width: 250px;
-        min-width: 250px;
-        flex-shrink: 0;
-        background: #2c3e50;
-        color: white;
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-        transition: transform 0.3s ease;
-        z-index: 1000;
-      }
-      .sidebar-header {
-        padding: 20px;
-        font-size: 20px;
-        font-weight: bold;
-        background: #1a252f;
-        text-align: center;
-        border-bottom: 1px solid #34495e;
-      }
-      .sidebar-menu {
-        display: flex;
-        flex-direction: column;
-        padding-top: 10px;
-        flex-grow: 1;
-      }
-      .sidebar-menu a {
-        padding: 15px 25px;
-        text-decoration: none;
-        font-size: 16px;
-        color: #ecf0f1;
-        display: block;
-        transition: 0.2s;
-        border-left: 4px solid transparent;
-        cursor: pointer;
-      }
-      .sidebar-menu a:hover {
-        background: #34495e;
-      }
-      .sidebar-menu a.active {
-        background: #34495e;
-        border-left-color: #3498db;
-        font-weight: bold;
-      }
-      .main-content {
-        flex-grow: 1;
-        height: 100vh;
-        overflow-y: auto;
-        background-color: #f8f9fa;
-        display: flex;
-        flex-direction: column;
-      }
-      .topbar {
-        background: white;
-        padding: 15px 25px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-      }
-      .menu-toggle {
-        font-size: 24px;
-        cursor: pointer;
-        display: none;
-        background: none;
-        border: none;
-        color: #2c3e50;
-        padding: 0;
-        margin-right: 15px;
-      }
-      .topbar-left {
-        display: flex;
-        align-items: center;
-      }
-      .topbar-title {
-        margin: 0;
-        font-size: 18px;
-        color: #2c3e50;
-        font-weight: 600;
-      }
-      .danger-btn {
-        background-color: #dc3545;
-        width: auto;
-        padding: 8px 15px;
-        margin: 0;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 600;
-      }
-      .danger-btn:hover {
-        background-color: #c82333;
-      }
-      .content-container {
-        padding: 25px;
-        max-width: 1200px;
-        margin: 0 auto;
-        width: 100%;
-        box-sizing: border-box;
-      }
-      .dashboard-view {
-        background: white;
-        padding: 25px;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        animation: fadeIn 0.4s ease-in-out;
-      }
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(5px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      .table-responsive {
-        overflow-x: auto;
-        width: 100%;
-      }
-      #inventory th,
-      #inventory td {
-        text-align: center;
-      }
-      .sidebar-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 999;
-      }
-      @media (max-width: 768px) {
-        .sidebar {
-          position: fixed;
-          transform: translateX(-100%);
-        }
-        .sidebar.open {
-          transform: translateX(0);
-        }
-        .menu-toggle {
-          display: block;
-        }
-        .sidebar-overlay.open {
-          display: block;
-        }
-        .content-container {
-          padding: 15px;
-        }
-        .dashboard-view {
-          padding: 15px;
-        }
-      }
-    </style>
   </head>
   <body>
     <div id="dashboard-wrapper">
-      <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+      <div class="sidebar-overlay" onclick="toggleMenu()"></div>
 
       <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">Jarvis OS</div>
-        <div class="sidebar-menu">
-          <a class="nav-link" href="inventory.html">📦 Inventory</a>
-          <a class="nav-link" href="summary.html">📊 Summary</a>
-          <a class="nav-link" href="guide.html">📖 Guide</a>
-          <a class="nav-link" href="about.html">👨‍💻 About Us</a>
-          <a class="nav-link" href="jarvis.html">🤖 Jarvis</a>
+        <div class="sidebar-header">
+          <div class="logo-area">
+            <div class="header-icon">❄️</div>
+            <span class="header-text">Jarvis OS</span>
+          </div>
+          <button class="close-btn" onclick="toggleMenu()">×</button>
+        </div>
+        <div class="nav-links">
+          <a class="nav-item active" href="inventory.html"
+            ><div class="icon-box">📦</div>
+            <span class="nav-text">Inventory</span></a
+          >
+          <a class="nav-item" href="summary.html"
+            ><div class="icon-box">📊</div>
+            <span class="nav-text">Summary</span></a
+          >
+          <a class="nav-item" href="guide.html"
+            ><div class="icon-box">📖</div>
+            <span class="nav-text">Guide</span></a
+          >
+          <a class="nav-item" href="about.html"
+            ><div class="icon-box">👨‍💻</div>
+            <span class="nav-text">About Us</span></a
+          >
+          <a class="nav-item" href="jarvis.html"
+            ><div class="icon-box">🤖</div>
+            <span class="nav-text">Jarvis</span></a
+          >
+        </div>
+        <div class="bottom-section" id="logout-section">
+          <a class="nav-item logout-item" onclick="logout()"
+            ><div class="icon-box">🚪</div>
+            <span class="nav-text">Logout</span></a
+          >
         </div>
       </div>
 
       <div class="main-content">
-        <div class="topbar">
-          <div class="topbar-left">
-            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
-            <h2 class="topbar-title" id="page-title">Live Inventory</h2>
-          </div>
-          <button class="danger-btn" onclick="logout()">Logout</button>
+        <div class="mobile-header">
+          <button class="menu-btn" onclick="toggleMenu()">☰</button>
+          <span class="logo-text">Jarvis OS</span>
         </div>
 
-        <div class="content-container">
-          <div id="inventory-tab" class="dashboard-view">
-            <div
+        <div class="content-wrapper animate-fade-in">
+          <h2 class="page-title">Live Inventory</h2>
+
+          <div class="mobile-controls">
+            <div class="mobile-search-box">
+              <input
+                type="text"
+                id="mobile-search-input"
+                placeholder="Search inventory..."
+              />
+            </div>
+            <div class="mobile-sort-box">
+              <select id="mobile-sort-select">
+                <option value="0_asc">Name (A-Z)</option>
+                <option value="1_desc">Highest Qty</option>
+                <option value="6_asc">Expiring Soon</option>
+              </select>
+            </div>
+          </div>
+
+          <div
+            style="
+              background-color: #fff3f3;
+              padding: 20px;
+              border-radius: 8px;
+              margin-bottom: 25px;
+              border-left: 5px solid #e74c3c;
+            "
+          >
+            <h3
               style="
-                background-color: #fff3f3;
-                padding: 20px;
-                border-radius: 8px;
-                margin-bottom: 25px;
-                border-left: 5px solid #dc3545;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+                margin: 0;
+                color: #2c3e50;
+                font-size: 16px;
+                font-weight: 600;
               "
             >
-              <h3
-                style="
-                  margin: 0;
-                  color: #2c3e50;
-                  font-size: 18px;
-                  font-weight: 600;
-                "
+              🚨 You wasted
+              <span
+                id="weekly-waste-count"
+                style="color: #e74c3c; font-weight: bold"
+                >0</span
               >
-                🚨 You wasted
-                <span
-                  id="weekly-waste-count"
-                  style="color: #dc3545; font-weight: 800; font-size: 22px"
-                  >0</span
-                >
-                items last 7 days and
-                <span
-                  id="monthly-waste-count"
-                  style="color: #dc3545; font-weight: 800; font-size: 22px"
-                  >0</span
-                >
-                items last 30 days.
-              </h3>
-            </div>
-
-            <div class="table-responsive">
-              <table id="inventory" class="display" style="width: 100%">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Unit</th>
-                    <th>Category</th>
-                    <th>Expiry</th>
-                    <th>Status</th>
-                    <th>Days Left</th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
+              items last 7 days and
+              <span
+                id="monthly-waste-count"
+                style="color: #e74c3c; font-weight: bold"
+                >0</span
+              >
+              items last 30 days.
+            </h3>
           </div>
-        </div>
 
-        <div
-          style="
-            text-align: center;
-            padding: 20px;
-            color: #7f8c8d;
-            font-size: 14px;
-            margin-top: auto;
-          "
-        >
-          Version 4
+          <div class="table-responsive">
+            <table id="inventory" class="display" style="width: 100%">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Qty</th>
+                  <th>Unit</th>
+                  <th>Category</th>
+                  <th>Expiry</th>
+                  <th>Status</th>
+                  <th>Days Left</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+          <div
+            style="
+              text-align: center;
+              padding: 20px;
+              color: #7f8c8d;
+              font-size: 14px;
+              margin-top: auto;
+            "
+          >
+            Version 4
+          </div>
         </div>
       </div>
     </div>
@@ -286,16 +152,21 @@
       let currentUser = sessionStorage.getItem("currentUser");
       let currentPass = sessionStorage.getItem("currentPass");
 
-      // Route validation
       if (!currentUser) window.location.href = "index.html";
 
       $(document).ready(function () {
         loadTable();
-        loadWasteCounts(); // Fetch the summary counts on page load
+        loadWasteCounts();
       });
 
-      function toggleSidebar() {
-        $("#sidebar, .sidebar-overlay").toggleClass("open");
+      function toggleMenu() {
+        $("#sidebar").toggleClass("open");
+        $(".sidebar-overlay").toggleClass("open");
+      }
+
+      function logout() {
+        sessionStorage.clear();
+        window.location.href = "index.html";
       }
 
       function loadWasteCounts() {
@@ -310,27 +181,22 @@
           }),
           success: function (response) {
             let json;
-            if (typeof response === "object") json = response;
-            else {
-              try {
-                json = JSON.parse(response);
-              } catch (e) {
-                json = { status: "error" };
-              }
+            try {
+              json =
+                typeof response === "object" ? response : JSON.parse(response);
+            } catch (e) {
+              json = { status: "error" };
             }
 
             if (json.status === "success") {
-              let weeklyData = json.weekly || [];
-              let monthlyData = json.monthly || [];
-              let weeklyTotal = weeklyData.reduce(
+              let weeklyTotal = (json.weekly || []).reduce(
                 (sum, item) => sum + (Number(item.qty) || 0),
                 0,
               );
-              let monthlyTotal = monthlyData.reduce(
+              let monthlyTotal = (json.monthly || []).reduce(
                 (sum, item) => sum + (Number(item.qty) || 0),
                 0,
               );
-
               $("#weekly-waste-count").text(
                 Number.isInteger(weeklyTotal)
                   ? weeklyTotal
@@ -348,7 +214,7 @@
 
       function loadTable() {
         if ($.fn.DataTable.isDataTable("#inventory")) {
-          $("#inventory").DataTable().ajax.reload();
+          $("#inventory").DataTable().ajax.reload(null, false);
           return;
         }
 
@@ -366,15 +232,14 @@
               }),
               success: function (response) {
                 let json;
-                if (typeof response === "object") json = response;
-                else {
-                  try {
-                    json = JSON.parse(response);
-                  } catch (e) {
-                    json = { data: [] };
-                  }
+                try {
+                  json =
+                    typeof response === "object"
+                      ? response
+                      : JSON.parse(response);
+                } catch (e) {
+                  json = { data: [] };
                 }
-
                 if (json.error) {
                   alert(json.error);
                   logout();
@@ -416,27 +281,46 @@
                   ? "N/A"
                   : moment(d).format("YYYY-MM-DD"),
             },
-            { data: "status", defaultContent: "N/A" },
+
+            // --- UPDATED STATUS COLOR LOGIC ---
+            {
+              data: "status",
+              defaultContent: "N/A",
+              render: function (data) {
+                let statusText = String(data).toUpperCase();
+
+                if (statusText === "EXPIRED") {
+                  return `<span style="color: #e74c3c; font-weight: 800;">${data}</span>`; // Red
+                } else if (
+                  statusText === "SOON" ||
+                  statusText === "EXPIRING SOON"
+                ) {
+                  return `<span style="color: #f39c12; font-weight: 800;">${data}</span>`; // Yellow
+                } else {
+                  return `<span style="color: #27ae60; font-weight: 800;">${data}</span>`; // Green
+                }
+              },
+            },
+
+            // --- UPDATED DAYS LEFT COLOR LOGIC ---
             {
               data: "days_left",
               defaultContent: "N/A",
               render: function (data) {
-                if (data === "N/A" || data === null || data === "")
-                  return "N/A";
                 let days = parseInt(data);
                 if (isNaN(days)) return data;
-                if (days < 0)
-                  return `<span style="color: #dc3545; font-weight: bold;">Expired ${Math.abs(days)} days ago</span>`;
-                return days;
+
+                if (days < 0) {
+                  return `<span style="color: #e74c3c; font-weight: bold;">Expired ${Math.abs(days)} days ago</span>`;
+                } else if (days <= 3) {
+                  return `<span style="color: #f39c12; font-weight: bold;">${days} days left</span>`;
+                } else {
+                  return `<span style="color: #27ae60; font-weight: bold;">${days} days</span>`;
+                }
               },
             },
           ],
         });
-      }
-
-      function logout() {
-        sessionStorage.clear();
-        window.location.href = "index.html";
       }
     </script>
   </body>
