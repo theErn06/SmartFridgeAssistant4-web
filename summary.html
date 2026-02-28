@@ -321,7 +321,7 @@
       let currentPass = sessionStorage.getItem("currentPass");
 
       // Route validation
-      if (!currentUser) window.location.href = "login.html";
+      if (!currentUser) window.location.href = "index.html";
 
       $(document).ready(function () {
         loadSummaryTables();
@@ -433,7 +433,7 @@
 
       function logout() {
         sessionStorage.clear();
-        window.location.href = "login.html";
+        window.location.href = "index.html";
       }
     </script>
   </body>
