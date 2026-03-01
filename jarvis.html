@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="style.css" />
     <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
     <style>
-      /* BULLETPROOF MOBILE VIEWPORT FIX */
+      /* Specialized Full-Screen Lock for Direct Chat Mode */
       html,
       body {
         position: fixed !important;
@@ -31,79 +31,68 @@
         width: 100%;
         height: 100%;
       }
-      .chat-controls {
-        padding-bottom: calc(15px + env(safe-area-inset-bottom)) !important;
+      .direct-header {
+        background: #fff;
+        padding: 15px 20px;
+        display: flex;
+        align-items: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        flex-shrink: 0;
+        z-index: 10;
+      }
+      .back-btn {
+        background: #e74c3c;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 15px;
+        transition: background 0.2s;
+      }
+      .back-btn:hover {
+        background: #c0392b;
+      }
+
+      /* The chat wrapper uses the remaining space safely */
+      .direct-chat-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 15px;
+        min-height: 0;
+        padding-bottom: calc(15px + env(safe-area-inset-bottom));
       }
     </style>
   </head>
   <body>
     <div class="direct-wrapper">
-      <div
-        style="
-          background: #fff;
-          padding: 10px 15px;
-          display: flex;
-          align-items: center;
-          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-          z-index: 10;
-          flex-shrink: 0;
-        "
-      >
-        <button
-          onclick="goBack()"
+      <div class="direct-header">
+        <button onclick="goBack()" class="back-btn">
+          <span style="font-size: 18px; line-height: 1">←</span> Go Back
+        </button>
+        <h3
           style="
-            background: #e74c3c;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
+            margin: 0 0 0 15px;
+            color: #2c3e50;
+            font-size: 18px;
+            font-weight: 700;
           "
         >
-          <span style="font-size: 16px">←</span> Go Back
-        </button>
-        <h3 style="margin: 0 0 0 15px; color: #2c3e50; font-size: 18px">
           Jarvis Direct Link
         </h3>
       </div>
 
-      <div
-        class="jarvis-wrapper"
-        style="
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-          padding: 15px;
-        "
-      >
+      <div class="direct-chat-area">
         <div
           class="chat-container"
-          style="
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            border-radius: 12px;
-            overflow: hidden;
-            background: #fff;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-          "
+          style="border: none; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05)"
         >
-          <div
-            class="chat-history"
-            id="chat-history"
-            style="
-              flex: 1;
-              overflow-y: auto;
-              padding: 15px;
-              background: #fdfdfd;
-            "
-          >
+          <div class="chat-history" id="chat-history">
             <div class="chat-msg bot-msg">
               <img
                 src="jarvis-icon.jpg"
@@ -124,30 +113,12 @@
               event.preventDefault();
               sendText();
             "
-            style="
-              flex-shrink: 0;
-              display: flex;
-              padding: 15px;
-              background: #fff;
-              border-top: 1px solid #eee;
-              gap: 10px;
-              align-items: center;
-            "
           >
             <input
               type="text"
               id="chat-input"
               placeholder="Message Jarvis..."
               autocomplete="off"
-              style="
-                flex: 1;
-                padding: 12px 20px;
-                border: 1px solid #ccc;
-                border-radius: 25px;
-                outline: none;
-                font-size: 16px;
-                min-width: 0;
-              "
             />
 
             <button
@@ -198,13 +169,14 @@
 
     <script src="jarvis.js"></script>
     <script>
-      // The fix: Set a flag so JS knows we are intentionally leaving
+      // Tells the fetch catch block that the user is intentionally leaving
       window.isNavigating = false;
 
       function goBack() {
         window.isNavigating = true;
         window.close();
 
+        // Failsafe if the browser blocks closing the tab
         setTimeout(() => {
           window.location.href = "inventory.html";
         }, 150);
