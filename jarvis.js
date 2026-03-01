@@ -1,16 +1,14 @@
 // ==========================================
-// 1. SMART IP REDIRECTOR (FIXES 404 ERROR)
+// 1. SMART IP REDIRECTOR
 // ==========================================
 function extractCleanIp(inputString) {
     if (!inputString) return null;
-    // Magically extracts just the IPv4 address, ignoring http://, ports, or extra text
     let match = inputString.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/);
     return match ? match[0] : inputString.replace(/^https?:\/\//, '').split(':')[0].replace(/\/$/, "");
 }
 
 let currentHost = window.location.hostname;
 
-// If user opens jarvis.html on GitHub, prompt and redirect instantly to local PC
 if (currentHost.includes('github.io')) {
     let savedIp = localStorage.getItem("jarvis_ip");
     let rawIp = prompt("Jarvis Direct Link:\n\nYou are on the cloud version. To connect, please enter the IP shown on your Arduino Display (e.g., 192.168.1.10):", savedIp || "");
@@ -23,31 +21,24 @@ if (currentHost.includes('github.io')) {
 }
 
 // ==========================================
-// 2. GLOBAL VARIABLES
+// 2. GLOBAL VARIABLES & SESSION (Cleaned up!)
 // ==========================================
 const API_URL = 'https://script.google.com/macros/s/AKfycbwR3LH7qkeNNNZgEhOSMFqXZcO9xyVF7DiQau7gDxcTJ6ljtgD4EwrIm8tmC-B-fMpMag/exec'; 
-let currentUser = null;
-let currentPass = null;
 
-// Always uses relative path because it's hosted locally
+// Simply grab the active user straight from the browser storage
+let currentUser = sessionStorage.getItem('currentUser');
+let currentPass = sessionStorage.getItem('currentPass');
+
 const JARVIS_URL = `/chat`; 
 const MIC_SVG = `<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>`;
 const STOP_SVG = `<svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12"></rect></svg>`;
 
 // ==========================================
-// 3. INITIALIZATION (Document Ready)
+// 3. INITIALIZATION
 // ==========================================
 $(document).ready(function() {
-    toggleLogoutButton(false);
-    var savedUser = sessionStorage.getItem('currentUser');
-    var savedPass = sessionStorage.getItem('currentPass');
     
-    if (savedUser && savedPass) {
-        currentUser = savedUser;
-        currentPass = savedPass;
-        toggleLogoutButton(true);
-    }
-
+    // Inventory search/sort bindings
     $('#mobile-search-input').on('keyup', function() {
         if ($.fn.DataTable.isDataTable('#inventory')) {
             $('#inventory').DataTable().search(this.value).draw();
@@ -62,6 +53,7 @@ $(document).ready(function() {
         }
     });
 
+    // Chat bindings
     $('#chat-input').on('keypress', function (e) {
         if(e.which === 13) {
             e.preventDefault();
@@ -74,10 +66,6 @@ $(document).ready(function() {
         if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
     });
 });
-
-function toggleLogoutButton(show) {
-    if (show) $('#logout-section').show(); else $('#logout-section').hide();
-}
 
 // ==========================================
 // 4. JARVIS CHAT LOGIC
@@ -126,7 +114,6 @@ function sendText() {
         speakText(reply);
     })
     .catch(err => {
-        // Silently ignore errors if user is leaving the page
         if (window.isNavigating) return; 
 
         console.error("Jarvis Error:", err);
