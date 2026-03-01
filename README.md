@@ -12,11 +12,11 @@ Website: https://theern06.github.io/SmartFridgeAssistant4-web/
 User have to log in before accessing to the Jarvis website. 
 
 The version 4 website consists of 5 main page which are:
-Inventory page
-Summary (Waste Food Data)
-Guide
-About Us
-Jarvis
+Inventory page,
+Summary (Waste Food Data),
+Guide,
+About Us,
+Jarvis,
 
 
 Page 1: Inventory Page 
@@ -38,7 +38,7 @@ Page 3: Guide Guide page shows the system overview, hardware & interaction guide
 
 Page 4: About Us About us page shows some information about this project and some of the models specifications used.
 
-Page 5: Jarvis Page 
+Page 5: Jarvis Page
 Before entering the Jarvis page, user are require to connect the same network as the PC network. Upon entering the Jarvis Page, the website will ask the user to enter the IP address as shown in the Arduino LED 16x2 display (when restart the PC). Once sucessfully entered, user able to chat via text or voice. All the talking feature is avaliable same as directly talked to the fridge (PC). 
 
 Note that the website will automatically open a new tab and automatically close after user clikced "Go back".
