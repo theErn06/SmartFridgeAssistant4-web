@@ -30,12 +30,12 @@ if __name__ == "__main__":
 
     # 3. Create the server function and push it to a background thread so it NEVER blocks
     def start_server():
-        # WE NOW CHANGE THE DIRECTORY TO THE 'Website' FOLDER SO THE BROWSER CAN SEE IT
+        # WE NOW CHANGE THE DIRECTORY TO THE OUTSIDE FOLDER SO THE BROWSER CAN SEE THE HTML
         try:
             os.chdir(fj.WEB_DIR)
         except FileNotFoundError:
-            print(f"\n[❌ FATAL ERROR] Could not find the 'Website' folder at: {fj.WEB_DIR}")
-            print("Please ensure your 'Jarvis' folder and your 'Website' folder are sitting next to each other.")
+            print(f"\n[❌ FATAL ERROR] Could not find your website files at: {fj.WEB_DIR}")
+            print("Please ensure your HTML files are sitting just outside your 'Jarvis' folder.")
             os._exit(1)
             
         print(f"\n   [🌐] Unified Web Server & API active!")
