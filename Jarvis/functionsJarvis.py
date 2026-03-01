@@ -21,8 +21,9 @@ from http.server import SimpleHTTPRequestHandler
 # CONFIGURATION & FILE PATHS
 # ==========================================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# NEW: Instructs Python to go up one folder, then into the "Website" folder
-WEB_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, '..', 'Website'))
+
+# NEW: Instructs Python to go UP one level (outside the Jarvis folder)
+WEB_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, '..'))
 
 # Keep the database files safely inside the Jarvis folder
 MEMORY_FILE = os.path.join(SCRIPT_DIR, "fridge.json")       
@@ -605,12 +606,12 @@ class JarvisAPIHandler(SimpleHTTPRequestHandler):
         # =========================================
         requested_file = self.path.split('?')[0].lstrip('/')
         
-        # WE NOW INSTRUCT PYTHON TO LOOK IN THE 'Website' DIRECTORY
+        # WE NOW INSTRUCT PYTHON TO LOOK IN THE PARENT DIRECTORY
         full_path = os.path.join(WEB_DIR, requested_file)
         
         if not os.path.exists(full_path):
             print(f"\n   [❌ ERROR 404] Your phone requested '{requested_file}'")
-            print(f"   👉 But it is MISSING from your Website folder!")
+            print(f"   👉 But it is MISSING from your website folder!")
             print(f"   👉 Please ensure '{requested_file}' is located inside: {WEB_DIR}")
             
         super().do_GET()
