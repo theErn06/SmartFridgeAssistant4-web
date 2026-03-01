@@ -23,8 +23,6 @@ if (currentHost.includes('github.io')) {
 // ==========================================
 // 2. GLOBAL VARIABLES & SESSION (Cleaned up!)
 // ==========================================
-const API_URL = 'https://script.google.com/macros/s/AKfycbwR3LH7qkeNNNZgEhOSMFqXZcO9xyVF7DiQau7gDxcTJ6ljtgD4EwrIm8tmC-B-fMpMag/exec'; 
-
 // Simply grab the active user straight from the browser storage
 let currentUser = sessionStorage.getItem('currentUser');
 let currentPass = sessionStorage.getItem('currentPass');
